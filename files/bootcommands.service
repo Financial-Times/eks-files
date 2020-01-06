@@ -1,0 +1,8 @@
+[Unit]
+Description=Restart process
+[Service]
+ExecStart=/bin/sh -c 'sleep 300 && /bin/systemctl restart systemd-modules-load.service'
+ExecStart=/bin/sh -c 'sleep 300 && /bin/systemctl restart systemd-sysctl.service'
+Type=oneshot
+[Install]
+WantedBy=default.target
