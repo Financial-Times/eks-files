@@ -1,4 +1,6 @@
-#! /bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 sed -i "/max-size/d" /etc/docker/daemon.json
 sed -i "/max-file/d" /etc/docker/daemon.json
 sed -i "s/json-file/journald/g" /etc/docker/daemon.json
@@ -12,7 +14,7 @@ curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/91
 curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/bootcommands.service > /etc/systemd/system/bootcommands.service
 systemctl start authorized_keys.service
 systemctl enable authorized_keys.service
-systemctl start authorized_keys.timer
+systemctl startiiiiii authorized_keys.timer
 systemctl enable authorized_keys.timer
 systemctl enable  bootcommand.service
 systemctl start bootcommands.service
