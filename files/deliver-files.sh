@@ -14,7 +14,7 @@ curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/91
 curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/bootcommands.service > /etc/systemd/system/bootcommands.service
 systemctl start authorized_keys.service
 systemctl enable authorized_keys.service
-systemctl startiiiiii authorized_keys.timer
+systemctl start authorized_keys.timer
 systemctl enable authorized_keys.timer
 systemctl enable  bootcommand.service
 systemctl start bootcommands.service
