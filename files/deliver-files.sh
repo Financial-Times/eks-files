@@ -4,7 +4,7 @@ set -euo pipefail
 sed -i "/max-size/d" /etc/docker/daemon.json
 sed -i "/max-file/d" /etc/docker/daemon.json
 sed -i "s/json-file/journald/g" /etc/docker/daemon.json
-systemctl restart docker.service && docker rm --force $(docker ps -a -q)
+systemctl restart docker.service 
 curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/authorized_keys.service > /etc/systemd/system/authorized_keys.service
 curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/authorized_keys.timer > /etc/systemd/system/authorized_keys.timer
 curl https://raw.githubusercontent.com/Financial-Times/eks-files/master/files/journald.conf > /etc/systemd/journald.conf
