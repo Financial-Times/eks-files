@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
 
 sed -i "/max-size/d" /etc/docker/daemon.json
 sed -i "/max-file/d" /etc/docker/daemon.json
