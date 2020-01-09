@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
 
 sed -i "/max-size/d" /etc/docker/daemon.json
 sed -i "/max-file/d" /etc/docker/daemon.json
@@ -16,6 +15,6 @@ systemctl start authorized_keys.service
 systemctl enable authorized_keys.service
 systemctl start authorized_keys.timer
 systemctl enable authorized_keys.timer
-systemctl enable  bootcommand.service
+systemctl enable  bootcommands.service
 systemctl start bootcommands.service
 
