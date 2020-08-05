@@ -46,8 +46,6 @@ MaxLevelConsole=crit
 Compress=false
 RateLimitInterval=0
 RateLimitBurst=0
-SystemMaxUse=4G
-RuntimeMaxUse=4G
 EOF
 
 cp /usr/lib/systemd/system/systemd-journald.service /systemd-journald.service.org.bkp
