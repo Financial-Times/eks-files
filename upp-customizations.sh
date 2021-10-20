@@ -3,13 +3,6 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-echo "Customize /etc/docker/daemon.json"
-sed -i "/max-size/d" /etc/docker/daemon.json
-sed -i "/max-file/d" /etc/docker/daemon.json
-sed -i "s/json-file/journald/g" /etc/docker/daemon.json
-
-systemctl restart docker.service
-
 echo "Add authorized keys setup"
 cat > /etc/systemd/system/authorized_keys.service << EOF
 [Unit]
