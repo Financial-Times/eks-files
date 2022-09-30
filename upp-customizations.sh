@@ -11,33 +11,16 @@ sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin
 rm -f crictl-$VERSION-linux-amd64.tar.gz
 
 echo "Add authorized keys setup"
-cat > /etc/systemd/system/authorized_keys.service << EOF
-[Unit]
-Description=Update authorized_keys
-[Service]
-Type=oneshot
-ExecStartPre=/bin/sh -c 'mkdir -p /home/ec2-user/.ssh && touch /home/ec2-user/.ssh/authorized_keys'
-ExecStart=/bin/sh -c 'curl -sSL --retry 5 --retry-delay 2 -o /tmp/authorized_keys.sha512 https://raw.githubusercontent.com/Financial-Times/up-ssh-keys/master/authorized_keys.sha512'
-ExecStart=/bin/sh -c 'curl -sSL --retry 5 --retry-delay 2 -o /tmp/authorized_keys https://raw.githubusercontent.com/Financial-Times/up-ssh-keys/master/authorized_keys'
-ExecStart=/bin/sh -c 'cd /tmp/ && sha512sum -c authorized_keys.sha512 && cp authorized_keys /home/ec2-user/.ssh/authorized_keys && chmod 700 /home/ec2-user/.ssh && chmod 600 /home/ec2-user/.ssh/authorized_keys && chown -R ec2-user:ec2-user /home/ec2-user/.ssh'
-Restart=no
+cat > /root/get-ssh-keys.sh << "EOF"
+mkdir -p /home/ec2-user/.ssh && touch /home/ec2-user/.ssh/authorized_keys
+export GITHUB_TOKEN=$(aws ssm get-parameter --region eu-west-1 --name GITHUB_REPO_TOKEN | jq .Parameter.Value | sed 's/"//g')
+curl -H "Authorization: token ${GITHUB_TOKEN}" -sSL --retry 5 --retry-delay 2 -o /tmp/authorized_keys.sha512 https://raw.githubusercontent.com/Financial-Times/up-ssh-keys/master/authorized_keys.sha512
+curl -H "Authorization: token ${GITHUB_TOKEN}" -sSL --retry 5 --retry-delay 2 -o /tmp/authorized_keys https://raw.githubusercontent.com/Financial-Times/up-ssh-keys/master/authorized_keys
+cd /tmp/ && sha512sum -c authorized_keys.sha512 && cp authorized_keys /home/ec2-user/.ssh/authorized_keys && chmod 700 /home/ec2-user/.ssh && chmod 600 /home/ec2-user/.ssh/authorized_keys && chown -R ec2-user:ec2-user /home/ec2-user/.ssh
 EOF
-
-systemctl start authorized_keys.service
-systemctl enable authorized_keys.service
-
-cat > /etc/systemd/system/authorized_keys.timer << EOF
-[Unit]
-Description=Authorized keys timer
-[Timer]
-OnBootSec=1min
-OnUnitActiveSec=1min
-[Install]
-WantedBy=timers.target
-EOF
-
-systemctl start authorized_keys.timer
-systemctl enable authorized_keys.timer
+ls /root/get-ssh-keys.sh
+chmod 755 /root/get-ssh-keys.sh
+echo "*/10 * * * * root /root/get-ssh-keys.sh" >> /etc/crontab
 
 echo "Customize journald configuration"
 cat > /etc/systemd/journald.conf << EOF
