@@ -5,7 +5,7 @@ IFS=$'\n\t'
 
 
 ### Install crictl tool
-VERSION="v1.22.0"
+VERSION="v1.25.0"
 curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-${VERSION}-linux-amd64.tar.gz --output crictl-${VERSION}-linux-amd64.tar.gz
 sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin
 rm -f crictl-$VERSION-linux-amd64.tar.gz
