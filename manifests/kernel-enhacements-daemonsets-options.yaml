@@ -1,3 +1,92 @@
+# apiVersion: apps/v1
+# kind: DaemonSet
+# metadata:
+#   name: kernel-enhancement
+#   namespace: kube-system
+# spec:
+#   selector:
+#     matchLabels:
+#       name: kernel-enhancement
+#   template:
+#     metadata:
+#       labels:
+#         name: kernel-enhancement
+#     spec:
+#       hostPID: true
+#       tolerations:
+#       - operator: "Exists"
+#       containers:
+#       - name: kernel-enhancement
+#         image: amazonlinux:2023
+#         securityContext:
+#           privileged: true
+#         command:
+#         - sh
+#         - -c
+#         - |
+#           set -e
+
+#           # Install necessary tools
+#           dnf install -y wget util-linux systemd dbus
+
+#           # Download your script directly into the host's filesystem
+#           wget -O /host/tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
+#           chmod +x /host/tmp/upp-customizations.sh
+
+#           # Mount necessary filesystems for systemctl to work
+#           mount --bind /run /host/run
+#           mount --bind /sys/fs/cgroup /host/sys/fs/cgroup
+
+#           # Execute the script on the host using nsenter
+#           nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -x /tmp/upp-customizations.sh
+
+#           # Unmount the bind mounts
+#           umount /host/run
+#           umount /host/sys/fs/cgroup
+
+
+#           # Keep the container running
+#           sleep infinity
+#         volumeMounts:
+#         - name: host-root
+#           mountPath: /host
+#       volumes:
+#       - name: host-root
+#         hostPath:
+#           path: /
+#           type: Directory
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kernel-enhancement
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kernel-enhancement-role
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kernel-enhancement-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kernel-enhancement-role
+subjects:
+  - kind: ServiceAccount
+    name: kernel-enhancement
+    namespace: kube-system
+
+---
+
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -12,46 +101,74 @@ spec:
       labels:
         name: kernel-enhancement
     spec:
+      serviceAccountName: kernel-enhancement
       hostPID: true
       tolerations:
-      - operator: "Exists"
+        - operator: "Exists"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kernel-enhancement
+                    operator: DoesNotExist
       containers:
-      - name: kernel-enhancement
-        image: amazonlinux:2023
-        securityContext:
-          privileged: true
-        command:
-        - sh
-        - -c
-        - |
-          set -e
+        - name: kernel-enhancement
+          image: amazonlinux:2023
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "200Mi"
+              cpu: "200m"
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - sh
+            - -c
+            - |
+              set -e
 
-          # Install necessary tools
-          dnf install -y wget util-linux systemd dbus
+              # Install necessary tools
+              dnf install -y wget util-linux
 
-          # Download your script directly into the host's filesystem
-          wget -O /host/tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
-          chmod +x /host/tmp/upp-customizations.sh
+              # Install kubectl 
+              curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
 
-          # Mount necessary filesystems for systemctl to work
-          mount --bind /run /host/run
-          mount --bind /sys/fs/cgroup /host/sys/fs/cgroup
+              # Download your script directly into the host's filesystem
+              wget -O /host/tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
+              chmod +x /host/tmp/upp-customizations.sh
 
-          # Execute the script on the host using nsenter
-          nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -x /tmp/upp-customizations.sh
+              # Mount necessary filesystems for systemctl to work
+              mount --bind /run /host/run
+              mount --bind /sys/fs/cgroup /host/sys/fs/cgroup
 
-          # Unmount the bind mounts
-          umount /host/run
-          umount /host/sys/fs/cgroup
+              # Execute the script on the host using nsenter
+              nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -x /tmp/upp-customizations.sh
 
+              # Unmount the bind mounts
+              umount /host/run
+              umount /host/sys/fs/cgroup
 
-          # Keep the container running
-          sleep infinity
-        volumeMounts:
-        - name: host-root
-          mountPath: /host
+              # Label the node to prevent future pod scheduling
+              kubectl label node "$NODE_NAME" kernel-enhancement=done --overwrite
+
+              # Exit the container
+              exit 0
+
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
       volumes:
-      - name: host-root
-        hostPath:
-          path: /
-          type: Directory
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
