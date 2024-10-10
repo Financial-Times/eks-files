@@ -24,17 +24,27 @@ spec:
         - sh
         - -c
         - |
-          dnf install -y wget util-linux
+          set -e
 
-          wget -O /tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
-          chmod +x /tmp/upp-customizations.sh
-          
-          # Copy the script to the node filesystem
-          cp /tmp/upp-customizations.sh /host/tmp/upp-customizations.sh
-          
-          # Execute the script on the node using nsenter
-          nsenter --target 1 --mount --uts --ipc --net --pid -- chroot /host /bin/bash -x /tmp/upp-customizations.sh
-          
+          # Install necessary tools
+          dnf install -y wget util-linux systemd dbus
+
+          # Download your script directly into the host's filesystem
+          wget -O /host/tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
+          chmod +x /host/tmp/upp-customizations.sh
+
+          # Mount necessary filesystems for systemctl to work
+          mount --bind /run /host/run
+          mount --bind /sys/fs/cgroup /host/sys/fs/cgroup
+
+          # Execute the script on the host using nsenter
+          nsenter --target 1 --mount --uts --ipc --net --pid -- /bin/bash -x /tmp/upp-customizations.sh
+
+          # Unmount the bind mounts
+          umount /host/run
+          umount /host/sys/fs/cgroup
+
+
           # Keep the container running
           sleep infinity
         volumeMounts:
