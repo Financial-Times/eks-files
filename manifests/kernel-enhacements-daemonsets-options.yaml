@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kernel-enhancement
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: kernel-enhancement
+  template:
+    metadata:
+      labels:
+        name: kernel-enhancement
+    spec:
+      hostPID: true
+      tolerations:
+      - operator: "Exists"
+      containers:
+      - name: kernel-enhancement
+        image: amazonlinux:2023
+        securityContext:
+          privileged: true
+        command:
+        - sh
+        - -c
+        - |
+          dnf install -y wget util-linux
+
+          wget -O /tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
+          chmod +x /tmp/upp-customizations.sh
+          
+          # Copy the script to the node filesystem
+          cp /tmp/upp-customizations.sh /host/tmp/upp-customizations.sh
+          
+          # Execute the script on the node using nsenter
+          nsenter --target 1 --mount --uts --ipc --net --pid -- chroot /host /bin/bash -x /tmp/upp-customizations.sh
+          
+          # Keep the container running
+          sleep infinity
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
