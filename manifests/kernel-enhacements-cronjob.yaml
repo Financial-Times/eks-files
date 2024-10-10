@@ -1,0 +1,125 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: daemonset-manager
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: daemonset-manager-role
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: daemonset-manager-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: daemonset-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: daemonset-manager
+    namespace: kube-system
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manage-kernel-enhancement
+  namespace: kube-system
+spec:
+  schedule: "0 2 * * *" # Runs daily at 2 AM
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: daemonset-manager
+          restartPolicy: OnFailure
+          containers:
+            - name: manage-daemonset
+              image: bitnami/kubectl:latest
+              command:
+                - sh
+                - -c
+                - |
+                  # Apply the DaemonSet manifest
+                  kubectl apply -f - <<EOF
+                  apiVersion: apps/v1
+                  kind: DaemonSet
+                  metadata:
+                    name: kernel-enhancement
+                    namespace: kube-system
+                  spec:
+                    selector:
+                      matchLabels:
+                        name: kernel-enhancement
+                    template:
+                      metadata:
+                        labels:
+                          name: kernel-enhancement
+                      spec:
+                        hostPID: true
+                        tolerations:
+                          - operator: "Exists"
+                        containers:
+                          - name: kernel-enhancement
+                            image: amazonlinux:2023
+                            securityContext:
+                              privileged: true
+                            command:
+                              - sh
+                              - -c
+                              - |
+                                # Define the completion file file path
+                                COMPLETION_MARKER="/host/tmp/kernel-enhancement.done"
+
+                                # Check if the script has already been executed
+                                if [ -f "$COMPLETION_MARKER" ]; then
+                                  echo "Kernel enhancement script already executed on this node. Exiting."
+                                  exit 0
+                                fi
+
+                                dnf install -y wget util-linux
+                                
+                                wget -O /tmp/upp-customizations.sh https://raw.githubusercontent.com/Financial-Times/eks-files/master/upp-customizations.sh
+                                chmod +x /tmp/upp-customizations.sh
+                                
+                                # Copy the script to the node filesystem
+                                cp /tmp/upp-customizations.sh /host/tmp/upp-customizations.sh
+                                
+                                # Execute the script on the node using nsenter
+                                nsenter --target 1 --mount --uts --ipc --net --pid -- chroot /host /bin/bash -x /tmp/upp-customizations.sh
+                                
+                                # Create the completion marker
+                                touch "$COMPLETION_MARKER"
+                                
+                                # Exit the container
+                                exit 0
+                            volumeMounts:
+                              - name: host-root
+                                mountPath: /host
+                        volumes:
+                          - name: host-root
+                            hostPath:
+                              path: /
+                              type: Directory
+                  EOF
+
+                  # Wait for 2 minutes before deletion
+                  echo "Waiting for 2 minutes to allow DaemonSet to run..."
+                  sleep 120
+
+                  # Delete the DaemonSet
+                  echo "Deleting the DaemonSet..."
+                  kubectl delete daemonset kernel-enhancement -n kube-system
+
+                  echo "CronJob completed successfully."
